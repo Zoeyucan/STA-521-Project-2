@@ -51,66 +51,52 @@ As a first step in the exploratory data analysis, let's take a look at the distr
 
 \begin{table}[H]
 \begin{center}
-\begin{tabular}{|c|c|c|c|c|}
+\begin{tabular}{|c|c|c|c|c|c|}
 \hline
-Label & Img1 & Img2 & Img3 & Total\\
+Label & Image1 & Image2 & Image3 & Total & Rows\\
 \hline
-No cloud & 37.54\% & 43.98\% & 29.35\% & 36.96\%\\
-Unlabeled & 28.68\% & 38.24\% & 52.17\% & 39.7\%\\
-Cloud & 33.77\% & 17.78\% & 18.48\% & 23.34\%\\
+No cloud & 37.25\% & 43.78\% & 29.29\% & 36.78\% & 127080\\
+Unlabeled & 28.64\% & 38.46\% & 52.27\% & 39.79\% & 137495\\
+Cloud & 34.11\% & 17.77\% & 18.44\% & 23.43\% & 80981\\
 \hline
 \end{tabular}
 \end{center}
-\caption{Label distribution in the data.}
+\caption{Percentages of Pixels for the Different Images}
 \label{tab:labs}
 \end{table}
 
 We can plot labels in the $(x,y)$ plane to visualize them. In figure \@ref(fig:labs) we can see that cloudy regions and surface regions are separated by unlabeled regions, where the expert could not determine if pixels correspond to clouds or ice/snow.
 
-<!-- \begin{figure} -->
-<!--     \centering -->
-<!--     \begin{subfigure}[t]{0.32\textwidth} -->
-<!--         \centering -->
-<!--         \includegraphics[width=\linewidth]{graphs/01_labs_img1.png}  -->
-<!--         \caption{Labels for image 1.} \label{fig:labs_img1} -->
-<!--     \end{subfigure} -->
-<!--     \begin{subfigure}[t]{0.32\textwidth} -->
-<!--         \centering -->
-<!--         \includegraphics[width=\linewidth]{graphs/01_labs_img2.png}  -->
-<!--         \caption{Labels for image 2.} \label{fig:labs_img2} -->
-<!--     \end{subfigure} -->
-<!--     \begin{subfigure}[t]{0.32\textwidth} -->
-<!--         \centering -->
-<!--         \includegraphics[width=\linewidth]{graphs/01_labs_img3.png}  -->
-<!--         \caption{Labels for image 3.} \label{fig:labs_img3} -->
-<!--     \end{subfigure} -->
-<!--     \caption{Image labels plotted in the $(x,y)$ plane. White pixels correspond to clouds, gray pixels to land surface, and black pixels are unlabeled.} -->
-<!--     \label{fig:labs} -->
-<!-- \end{figure} -->
+\begin{figure}
+    \centering
+    \includegraphics[width=18cm]{graphs/part1_graph1.png}
+    \caption{Well-Labeled Beautiful Map}
+    \label{fig:pixel}
+\end{figure}
 
-Figure \@ref(fig:labs) shows strong spatial dependence present in the images. Cloudy pixels are generally surrounded by cloudy pixels, and the same pattern repeats for surface/non-cloudy pixels. This presents a challenge for pixel classification because we cannot treat the different pixels as independent and identically distributed. We must account for the spatial dependence in our classification models so they can generalize well to future unobserved images.
+Figure \@ref(fig:pixel) shows strong spatial dependence present in the images. Cloudy pixels are generally surrounded by cloudy pixels, and the same pattern repeats for surface/non-cloudy pixels. This presents a challenge for pixel classification because we cannot treat the different pixels as independent and identically distributed. We must account for the spatial dependence in our classification models so they can generalize well to future unobserved images.
 
 ## Exploratory Data Analysis
 
 To get a sense of how the predictors are related between them and with the labels, we include a correlation plot of the relevant variables in figure \@ref(fig:corrplot). The label column is encoded as 1 if the pixel is a cloud and -1 if it is not, so a positive correlation between label and a predictor can be roughly interpreted as an increase in the predictor being associated with an increase in "cloudiness". For this figure, we remove the unlabeled pixels to retain the numerical interpretation of the labels and the correlation with the predictors.
 
-<!-- \begin{figure} -->
-<!--     \centering -->
-<!--     \includegraphics[width=6cm]{graphs/01_corrplot.png}  -->
-<!--     \caption{Visual representation of Pearson's correlation matrix.} -->
-<!--     \label{fig:corrplot} -->
-<!-- \end{figure} -->
+\begin{figure}
+    \centering
+    \includegraphics[width=8cm]{graphs/corrplot.png}
+    \caption{Pairwise Correlation Plot}
+    \label{fig:corrplot}
+\end{figure}
 
 Figure \@ref(fig:corrplot) shows a positive correlation between label and the author-defined variables \texttt{ndai}, \texttt{sd}, and \texttt{corr}, and also shows a negative correlation between label and most radiance measurements. It is also interesting to note that the author-defined variables are negatively correlated with the radiance measurements while positively correlated among themselves. Similarly, radiance measurements are positively correlated. This was expected since these variables are all measuring light reflection at different angles.
 
 To take a closer look at some of these relationships, figure \@ref(fig:labdensities) shows the distribution of the author-defined variables and \texttt{rad\_an} for the two pixel classes. The figure includes density estimates and the median for each class. All variables were centered and scaled. For the variable \texttt{sd}, we use a logarithmic transformation because of heavy right-skeweness.
 
-<!-- \begin{figure} -->
-<!--     \centering -->
-<!--     \includegraphics[width=10cm]{graphs/01_lab_densities.png}  -->
-<!--     \caption{Distribution of author-defined variables and nadir radiance (rad\_an) across pixel labels (median values highlighted).} -->
-<!--     \label{fig:labdensities} -->
-<!-- \end{figure} -->
+\begin{figure}
+    \centering
+    \includegraphics[width=12cm]{graphs/density_image.png}
+    \caption{Relationship between the Expert Labels with the Individual Features}
+    \label{fig:labdensities}
+\end{figure}
 
 In figure \@ref(fig:labdensities) we can see that the distributions are visibly different for both classes. The differences and the distance between the medians are greater in the plots of \texttt{log(sd)} and \texttt{ndai}. It is interesting to note that @yu2008 use fixed cutoff thresholds for \texttt{sd} and \texttt{corr} but not for \texttt{ndai} since the "appropriate thresholds vary from one data unit to another". In our case, it seems like \texttt{ndai} is the most discriminating feature. We formalize this notion of "best features" on section 2.
 
