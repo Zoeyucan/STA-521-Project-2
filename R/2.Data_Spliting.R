@@ -1,99 +1,171 @@
 library(tidyverse)
-
+library(splitTools)
+library(caret)
+library(mlbench)
 #part a--------------------------------------------------------------
 
 # splitting testing and training data
 image = read_rds("cache/image.rds")
 #make this example reproducible
 set.seed(1)
-image$id <- 1:nrow(image)
+image$id = 1:nrow(image)
 #Use 70% of dataset as training set and remaining 30% as testing set
-train <- image %>% dplyr::sample_frac(0.7)
-test_18  <- dplyr::anti_join(image, train, by = 'id')
-
-#use block cross validation
-y_length = (max(image$y_coordinate)-min(image$y_coordinate)+1)/5
-x_length = (max(image$x_coordinate)-min(image$x_coordinate)+1)/2
+train = image %>% dplyr::sample_frac(0.7)
+test_block  = dplyr::anti_join(image, train, by = 'id')
 
 #find the coordinate of each block
-find_blocks <- function(x, y, cols = 2,rows = 3) {
-  x_min <- min(x)
-  x_max <- max(x)
-  x_step <- (x_max-x_min)/cols
+find_blocks = function(x, y, cols = 2,rows = 3) {
+  x_min = min(x)
+  x_max = max(x)
+  x_step = (x_max-x_min)/cols
 
-  y_min <- min(y)
-  y_max <- max(y)
-  y_step <- (y_max-y_min)/rows
+  y_min = min(y)
+  y_max = max(y)
+  y_step = (y_max-y_min)/rows
 
-  block <- tibble()
+  block = tibble()
 
   for (i in seq_len(rows)) {
     # make top and bottom
-    top <- floor(y_min + (i-1) * y_step)
-    bot <- floor(y_max - (rows-i) * y_step )
+    top = floor(y_min + (i-1) * y_step)
+    bot = floor(y_max - (rows-i) * y_step )
     if (i != rows)
-      bot <- bot - 1
+      bot = bot - 1
 
     for (j in seq_len(cols)){
       # make left and right
-      left <- floor(x_min + (j-1) * x_step)
-      right <- floor(x_max - (cols-j) * x_step )
+      left = floor(x_min + (j-1) * x_step)
+      right = floor(x_max - (cols-j) * x_step )
       if (j != cols)
-        right <- right - 1
+        right = right - 1
 
       block %>%
         bind_rows(data.frame(top, bot, left, right)) -> block
     }
   }
-  names(block) <- c("top", "bottom", "left", "right")
+  names(block) = c("top", "bottom", "left", "right")
   return(block)
 }
 
 
+split_blocks = function(block, cols = 2, rows = 3, train_num_blocks = 5, val_num_blocks = 1) {
+  set.seed(1)
+  train_index = sample(seq_len(cols*rows),train_num_blocks)
+  val_index = sample(setdiff(seq_len(cols*rows),train_index),val_num_blocks)
 
-split_data = function(data, block,cols = 2,rows = 3) {
-  final_data <- tibble()
-  for (i in seq_len(cols*rows)) {
-    coords <- block[i,]
+  train_blocks = block[train_index,]
+  val_blocks = block[val_index,]
+  return(list(train = train_blocks, val = val_blocks))
+}
+
+split_data = function(data, block) {
+  final_data = tibble()
+  for (i in seq_len(nrow(block))) {
+    coords = block[i,]
+
     data %>%
       filter(x_coordinate >= coords$left, x_coordinate <= coords$right,
              y_coordinate >= coords$top, y_coordinate <= coords$bottom) -> filtered_data
-    filtered_data$block = i
+
     final_data = rbind(final_data, filtered_data)
   }
 
   return(final_data)
 }
-## column = 2, row = 3
-block = find_blocks(image$x_coordinate,image$y_coordinate)
-splited_data_18 =split_data(train,block)
-splited_data_18 = splited_data_18%>% filter(expert_label == 1|expert_label == -1)
 
-#part b---------------------------------
-test_18 %>%
+split_blocks_main = function(df, cols = 2, rows = 3, train_num_blocks, val_num_blocks){
+  blocks = find_blocks(df$x_coordinate, df$y_coordinate)
+  block_indices = split_blocks(blocks, cols, rows,
+                                train_num_blocks, val_num_blocks)
+
+  val = split_data(df, block_indices$val)
+  train = split_data(df, block_indices$train)
+  return(list(val = val, train = train))
+}
+
+image_dfs = split_blocks_main(train, 2,3,5,1)
+
+train_block = image_dfs$train
+val_block = image_dfs$val
+
+#part b------------------------------------------------------------------
+
+#method1:block
+test_block %>%
   filter(expert_label != 0) %>%
   summarise(acc = mean(expert_label == -1))
 
-splited_data_18%>%
+val_block%>%
   filter(expert_label != 0) %>%
   summarise(acc = mean(expert_label == -1))
 
-
-library(splitTools)
-
-
+#method2: strtified
 # Split data into partitions
 set.seed(3451)
-inds <- partition(image$expert_label, p = c(train = 0.6, valid = 0.2, test = 0.2))
+inds = partition(image$expert_label, p = c(train = 0.6, valid = 0.2, test = 0.2))
 str(inds)
 
-#stratified data spliting
-train <- image[inds$train, ]
-valid <- image[inds$valid, ]
-test <- image[inds$test, ]
-test %>%
+#stratified data splitting
+train_stratified = image[inds$train, ]
+valid_stratified = image[inds$valid, ]
+test_stratified = image[inds$test, ]
+test_stratified %>%
   filter(expert_label != 0) %>%
   summarise(acc = mean(expert_label == -1))
-valid %>%
+valid_stratified %>%
   filter(expert_label != 0) %>%
   summarise(acc = mean(expert_label == -1))
+
+#part c------------------------------------------------------------------
+#k features by importance using the caret r packageR
+# ensure results are repeatable
+set.seed(1)
+#stratified
+x_train_stratified <- rbind(train_stratified,valid_stratified)%>%
+  dplyr::select(NDAI:Rad_AN)%>%
+  mutate("log(SD)" = log(SD))
+
+
+y_train_stratified <- rbind(train_stratified,valid_stratified)%>%
+  dplyr::select(expert_label)
+
+#ROC
+roc_imp_stratified <- filterVarImp(x = x_train_stratified, y = y_train_stratified$expert_label)
+roc_imp_stratified <- data.frame(cbind(variable = rownames(roc_imp_stratified), score = roc_imp_stratified[,1]))
+roc_imp_stratified$score <- as.double(roc_imp_stratified$score)
+
+roc_imp_stratified[order(roc_imp_stratified$score,decreasing = TRUE),]
+roc_imp_stratified$set = "Stratified"
+#block
+x_train_block <- rbind(train_block,val_block)%>%
+  dplyr::select(NDAI:Rad_AN)%>%
+  mutate("log(SD)" = log(SD))
+
+
+y_train_block <- rbind(train_block,val_block)%>%
+  dplyr::select(expert_label)
+
+#ROC
+roc_imp_block <- filterVarImp(x = x_train_block, y = y_train_block$expert_label)
+roc_imp_block <- data.frame(cbind(variable = rownames(roc_imp_block), score = roc_imp_block[,1]))
+roc_imp_block$score <- as.double(roc_imp_block$score)
+
+roc_imp_block[order(roc_imp_block$score,decreasing = TRUE),]
+roc_imp_block$set = "Block"
+df_roc_imp = rbind(roc_imp_stratified,roc_imp_block)
+varimp = ggplot(df_roc_imp, aes(x=reorder(variable, score), y=score,fill=set)) +
+#  geom_point() +
+  geom_bar(stat = 'identity', position = position_dodge(0.5),width = 0.5)+
+  scale_fill_manual(values=c('gray','black'))+
+  #geom_segment(aes(x=variable,xend=variable,y=0,yend=score,color = set,alpha = 0.7,linewidth = 5)) +
+  ylab("Variable Importance") +
+  xlab("Variable Name") +
+  coord_flip()+  theme_bw()
+ggsave(
+  "graphs/varimp_image.png",
+  varimp,
+  width = 15,
+  height = 12,
+  units = "cm"
+)
+

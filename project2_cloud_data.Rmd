@@ -211,10 +211,10 @@ We report the accuracy of a trivial classifier that predicts every pixel as non-
 \hline
 Splitting Method & Set & Accuracy\\
 \hline
-Block & Validation & 78.8\%\\
-Block & Test & 20.2\%\\
-K-means & Validation & 81.8\%\\
-K-means & Test & 86.3\%\\
+Block & Validation & 64.44\%\\
+Block & Test & 61.08\%\\
+Stratified & Validation & 61.08\%\\
+Stratified & Test & 61.08\%\\
 \hline
 \end{tabular}
 \caption{Accuracy of a trivial classifier.}
@@ -222,21 +222,22 @@ K-means & Test & 86.3\%\\
 }
 \parbox{.45\linewidth}{
 \centering
-\begin{tabular}{|lccc|}
+\begin{tabular}{|l|c|c|}
   \hline
-  var & AUC Block & AUC K-means & Avg AUC \\ 
+  Var & Scores of Stratified & Scores of Block  \\ 
   \hline
-  ndai & 1.00 & 0.99 & 0.99 \\ 
-  sd & 0.94 & 0.91 & 0.92 \\ 
-  rad\_af & 0.82 & 0.93 & 0.87 \\ 
-  rad\_bf & 0.87 & 0.83 & 0.85 \\ 
-  rad\_an & 0.71 & 0.88 & 0.80 \\ 
-  corr & 0.31 & 0.99 & 0.65 \\ 
-  rad\_cf & 0.87 & 0.20 & 0.54 \\ 
-  rad\_df & 0.86 & 0.05 & 0.45 \\ 
+  NDAI & 411.70 & 385.45  \\ 
+  log(SD) & 332.08 & 310.61  \\ 
+  CORR & 260.85 & 244.52\\
+  Rad\_AF & 222.36 & 208.68  \\ 
+  Rad\_AN & 222.30 & 208.62  \\ 
+  Rad\_BF & 188.57 & 177.11 \\ 
+  SD & 162.77 & 152.13 \\
+  Rad\_CF & 111.97 & 105.08  \\ 
+  Rad\_DF & 3.24 & 3.03  \\ 
   \hline
 \end{tabular}
-\caption{Single-predictor model performance.}
+\caption{First Order Importance Scores}
 \label{tab:aucsingle}
 }
 \end{table}
@@ -250,7 +251,12 @@ To formalize the selection of "best features" mentioned in section 1, we fit sin
 The results are shown in table \@ref(tab:aucsingle). We can see that \texttt{ndai} is the clear winner, followed by \texttt{sd}, both of which are author-defined predictors. Going back to figure \@ref(fig:labdensities), we expected \texttt{ndai} to perform well because the distributions between the two classes were well separated.
 
 As a visual assessment, we show the values of \texttt{ndai} plotted in space for the three original images. In figure \@ref(fig:ndai) we see what figure \@ref(fig:labdensities) suggested, that higher values of \texttt{ndai} are associated with cloudy pixels. This is further supported by the logistic regression model having a positive coefficient $\hat{\beta}_{ndai} = 2.008$.
-
+\begin{figure}
+    \centering
+    \includegraphics[width=10cm]{graphs/varimp_image.png}
+    \caption{Feature Importance}
+    \label{fig:varimp}
+\end{figure}
 <!-- \begin{figure} -->
 <!--     \centering -->
 <!--     \begin{subfigure}[t]{0.22\textwidth} -->
