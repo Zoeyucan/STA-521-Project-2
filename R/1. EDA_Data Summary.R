@@ -9,10 +9,11 @@ image3 = read.table("data/imagem3.txt",sep = "", header = FALSE)
 image1$class = "image1"
 image2$class = "image2"
 image3$class = "image3"
-image$class = factor(image$class)
+
 
 #combind image1-3
 image = rbind(image1,image2,image3)
+image$class = factor(image$class)
 colnames(image) = c("y_coordinate",
         "x_coordinate",
         "expert_label",
