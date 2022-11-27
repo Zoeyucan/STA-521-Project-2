@@ -204,11 +204,9 @@ lr_model_horizon = cvMaster(train,method = 'Horizontal', fold = 10, classifier="
 #random forest
 rf_model_block =  cvMaster(train,method = 'Block', classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
 rf_model_horizon =  cvMaster(train,method = 'Horizontal', fold = 10, classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
-
 #decision tree
 dt_model_block =  cvMaster(train,method = 'Block', classifier="rpart", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.03,0.001)))
 dt_model_horizon =  cvMaster(train,method = 'Horizontal', fold = 10, classifier="rpart", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.03,0.001)))
-
 #qda
 qda_model_block = cvMaster(train, method = 'Block', classifier="qda",  verbose=T)
 qda_model_horizon = cvMaster(train, method = 'Horizontal', fold = 10, classifier="qda",  verbose=T)
@@ -220,24 +218,21 @@ lda_model_horizon = cvMaster(train, method = 'Horizontal', fold = 10, classifier
 # rf_model_horizon =  cvMaster(train,method = 'Horizontal', fold = 10, classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
 
 #save models
-
+#logistic regression
 lr_model_block%>%write_rds("cache/model_lr_model_block.rds")
 lr_model_horizon%>%write_rds("cache/model_lr_model_horizon.rds")
-
+#random forest
 rf_model_block%>%write_rds("cache/model_rf_model_block.rds")
 rf_model_horizon%>%write_rds("cache/model_rf_model_horizon.rds")
-
+#decision tree
 dt_model_block%>%write_rds("cache/model_dt_model_block.rds")
 dt_model_horizon%>%write_rds("cache/model_dt_model_horizon.rds")
-
-
+#qda
 qda_model_block%>%write_rds("cache/model_qda_model_block.rds")
 qda_model_horizon%>%write_rds("cache/model_qda_model_horizon.rds")
-
+#lda
 lda_model_block%>%write_rds("cache/model_lda_model_block.rds")
 lda_model_horizon%>%write_rds("cache/model_lda_model_horizon.rds")
-
-#read training data
 
 
 
