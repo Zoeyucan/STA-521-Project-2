@@ -116,3 +116,6 @@ ggsave(
   height = 15,
   units = "cm"
 )
+
+image %>%
+  write_rds("cache/image.rds")
