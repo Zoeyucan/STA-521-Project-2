@@ -51,6 +51,7 @@ find_blocks = function(x, y, cols = 2,rows = 3) {
 split_blocks = function(block, cols = 2, rows = 3, train_num_blocks = 5, val_num_blocks = 1) {
   set.seed(1)
   train_index = sample(seq_len(cols*rows),train_num_blocks)
+  set.seed(11)
   val_index = sample(setdiff(seq_len(cols*rows),train_index),val_num_blocks)
 
   train_blocks = block[train_index,]
@@ -83,36 +84,33 @@ split_blocks_main = function(df, cols = 2, rows = 3, train_num_blocks, val_num_b
   return(list(val = val, train = train))
 }
 
-image_dfs = split_blocks_main(train, 2,3,5,1)
-
-train_block = image_dfs$train
-val_block = image_dfs$val
+image_dfs_1 = split_blocks_main(train, cols = 2, rows = 3, train_num_blocks = 5, val_num_blocks = 1)
+image_dfs_2 = split_blocks_main(train, cols = 1, rows = 10, train_num_blocks = 8, val_num_blocks = 2)
+#method1
+train_block_2_3 = image_dfs_1$train
+val_block_2_3 = image_dfs_1$val
+#method2
+train_block_1_10 = image_dfs_2$train
+val_block_1_10 = image_dfs_2$val
 
 #part b------------------------------------------------------------------
 
-#method1:block
-test_block %>%
+#method1:block 2*3
+train_block_2_3 %>%
   filter(expert_label != 0) %>%
   summarise(acc = mean(expert_label == -1))
 
-val_block%>%
+val_block_2_3%>%
   filter(expert_label != 0) %>%
   summarise(acc = mean(expert_label == -1))
 
-#method2: strtified
+#method2: block 1*10
 # Split data into partitions
-set.seed(3451)
-inds = partition(image$expert_label, p = c(train = 0.6, valid = 0.2, test = 0.2))
-str(inds)
-
-#stratified data splitting
-train_stratified = image[inds$train, ]
-valid_stratified = image[inds$valid, ]
-test_stratified = image[inds$test, ]
-test_stratified %>%
+train_block_1_10 %>%
   filter(expert_label != 0) %>%
   summarise(acc = mean(expert_label == -1))
-valid_stratified %>%
+
+val_block_1_10%>%
   filter(expert_label != 0) %>%
   summarise(acc = mean(expert_label == -1))
 
@@ -120,29 +118,15 @@ valid_stratified %>%
 #k features by importance using the caret r packageR
 # ensure results are repeatable
 set.seed(1)
-#stratified
-x_train_stratified <- rbind(train_stratified,valid_stratified)%>%
-  dplyr::select(NDAI:Rad_AN)%>%
-  mutate("log(SD)" = log(SD))
-
-
-y_train_stratified <- rbind(train_stratified,valid_stratified)%>%
-  dplyr::select(expert_label)
-
-#ROC
-roc_imp_stratified <- filterVarImp(x = x_train_stratified, y = y_train_stratified$expert_label)
-roc_imp_stratified <- data.frame(cbind(variable = rownames(roc_imp_stratified), score = roc_imp_stratified[,1]))
-roc_imp_stratified$score <- as.double(roc_imp_stratified$score)
-
-roc_imp_stratified[order(roc_imp_stratified$score,decreasing = TRUE),]
-roc_imp_stratified$set = "Stratified"
 #block
-x_train_block <- rbind(train_block,val_block)%>%
+x_train_block <- train_block_2_3%>%
+  filter(expert_label != 0)%>%
   dplyr::select(NDAI:Rad_AN)%>%
   mutate("log(SD)" = log(SD))
 
 
-y_train_block <- rbind(train_block,val_block)%>%
+y_train_block <-train_block_2_3%>%
+  filter(expert_label != 0)%>%
   dplyr::select(expert_label)
 
 #ROC
@@ -152,11 +136,34 @@ roc_imp_block$score <- as.double(roc_imp_block$score)
 
 roc_imp_block[order(roc_imp_block$score,decreasing = TRUE),]
 roc_imp_block$set = "Block"
-df_roc_imp = rbind(roc_imp_stratified,roc_imp_block)
+
+#horizontal block
+x_train_block_h <- train_block_1_10%>%
+  filter(expert_label != 0)%>%
+  dplyr::select(NDAI:Rad_AN)%>%
+  mutate("log(SD)" = log(SD))
+
+
+y_train_block_h <-train_block_1_10%>%
+  filter(expert_label != 0)%>%
+  dplyr::select(expert_label)
+
+
+#ROC
+roc_imp_block_h <- filterVarImp(x = x_train_block_h, y = y_train_block_h$expert_label)
+roc_imp_block_h <- data.frame(cbind(variable = rownames(roc_imp_block_h), score = roc_imp_block_h[,1]))
+roc_imp_block_h$score <- as.double(roc_imp_block_h$score)
+
+roc_imp_block_h[order(roc_imp_block_h$score,decreasing = TRUE),]
+roc_imp_block_h$set = "Horizontal Block"
+
+df_roc_imp = rbind(roc_imp_block,roc_imp_block_h,)
+
+
 varimp = ggplot(df_roc_imp, aes(x=reorder(variable, score), y=score,fill=set)) +
 #  geom_point() +
   geom_bar(stat = 'identity', position = position_dodge(0.5),width = 0.5)+
-  scale_fill_manual(values=c('gray','black'))+
+  scale_fill_manual(values=c('black','gray'))+
   #geom_segment(aes(x=variable,xend=variable,y=0,yend=score,color = set,alpha = 0.7,linewidth = 5)) +
   ylab("Variable Importance") +
   xlab("Variable Name") +
@@ -169,6 +176,18 @@ ggsave(
   units = "cm"
 )
 
-train %>%
+train = train%>%
+  filter(expert_label != 0)%>%
+  write_rds("cache/02_train.rds")
+train_block_2_3 %>%
   filter(expert_label != 0) %>%
-  write_rds("cache/2_train_block.rds")
+  write_rds("cache/02_train_block_2_3.rds")
+val_block_2_3 %>%
+  filter(expert_label != 0) %>%
+  write_rds("cache/02_val_block_2_3.rds")
+train_block_1_10 %>%
+  filter(expert_label != 0) %>%
+  write_rds("cache/02_train_block_1_10.rds")
+val_block_1_10 %>%
+  filter(expert_label != 0) %>%
+  write_rds("cache/02_val_block_1_10.rds")

@@ -1,6 +1,9 @@
+library(caret)
+library(data.table)
+library(pROC)
 library(tidyverse)
-library(tidymodels)
-#find the coordinate of each block
+library(pROC)
+
 find_blocks = function(x, y, cols = 2,rows = 3) {
   x_min = min(x)
   x_max = max(x)
@@ -34,9 +37,10 @@ find_blocks = function(x, y, cols = 2,rows = 3) {
   return(block)
 }
 
-split_data = function(data,cols = 2,rows = 3) {
-  block = find_blocks(data$x_coordinate,data$y_coordinate,cols ,rows )
+
+split_data = function(data, cols = 2,rows = 3) {
   final_data = tibble()
+  block = find_blocks(data$x_coordinate,data$y_coordinate,cols,rows)
   for (i in seq_len(nrow(block))) {
     coords = block[i,]
     data %>%
@@ -44,75 +48,152 @@ split_data = function(data,cols = 2,rows = 3) {
              y_coordinate >= coords$top, y_coordinate <= coords$bottom) -> filtered_data
     filtered_data$block = i
     final_data = rbind(final_data, filtered_data)
-
   }
+
   return(final_data)
 }
 
-train <- read_rds("cache/2_train_block.rds")
 
-table(split_data(train,2,3)$block)
+trainData = read_rds("cache/02_train.rds")
+trainData$expert_label=factor(trainData$expert_label)
+lr_model = cvMaster(trainData, classifier="glmnet", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.01,0.001)))
+#cvMaster-----------------------------------------------------------------------
+cvMaster = function(trainData,method = 'Block', label_col = "expert_label", folds=6, classifier="qda", metric="Accuracy",
+                 tune_param = c(-1), verbose = T) {
 
-##
-make_cvsplits <- function(.dt, .method = "block", .columns = 2, .rows = 3, .k) {
-  cv_att <- list(v = 0, strata = FALSE, repeats = 1)
 
-  if (.method == "block") {
-    out <- vector(mode = "list", length = .columns * .rows)
-    names <- vector(mode = "character", length = .columns * .rows)
-    blocks <- split_data(.dt, .columns, .rows)
 
-    for (i in 1:(.columns * .rows)) {
-      val_set <- which(blocks == i)
-      train_set <- (1:NROW(.dt))[-val_set]
-      out[[i]] <- rsample::make_splits(
-        list(analysis = train_set, assessment = val_set),
-        data = .dt
-      )
-      names[[i]] <- paste0("Fold", i)
+ set.seed(1)
+  #use training data from data splitting
+  if(method == 'Block'){
+    #column = 2, row = 3
+    if(folds == 6){
+      trainData = split_data(trainData, cols = 2,rows = 3)
     }
-    cv_att$v <- .columns * .rows
+    else{
+      stop("Please input correct folds")
+    }
+  }else{
+    if(folds == 10){
+      trainData = split_data(trainData, cols = 1,rows = 10)
+    }
+    else{
+      stop("Please input correct folds")
+    }
+
   }
+ trainData=trainData%>%
+    mutate('log(SD)' = log(SD))%>%
+    select(-x_coordinate,-y_coordinate,-class,-id,-SD)
+  accuracy_vector = matrix(0, folds, length(tune_param))
+  precision_vector = matrix(0, folds, length(tune_param))
+  recall_vector = matrix(0, folds, length(tune_param))
+  F1_vector = matrix(0, folds, length(tune_param))
+  auc_vector = matrix(0, folds, length(tune_param))
+  threshold = matrix(0, folds, length(tune_param))
+  for (i in 1:folds) {
+    # build train, val dataset
+    val_set = trainData%>%filter(block == i)%>%select(-block)
+    train_set = trainData%>%filter(block != i)%>%select(-block)
+    # Training using Caret Wrapper
+    for (j in 1:length(tune_param)) {
+      tp = tune_param[j]
+      fm = as.formula(paste0(label_col, " ~ ."))
+      caretctrl = trainControl(method = "none",classProbs = TRUE)
+      # since different model we use intake different preprocess option and different hyper parameter,
+      # here we use if-else to specify the training process
+      if (classifier == "glmnet") {
+        tune=data.frame(alpha=1,lambda=tp)
+        cvModel = train(
+          form = fm,
+          data = train_set,
+          method = classifier,
+          family = "binomial",
+          preProcess = c("center","scale"),
+          tuneLength = 1,
+          tuneGrid = tune,
+          metric = metric,
+          trControl = caretctrl
+        )
+      }
+      else if (classifier == "rpart") {
+        tune=data.frame(cp=tp)
+        cvModel = train(
+          form = fm,
+          data = train_set,
+          method = classifier,
+          tuneLength = 1,
+          tuneGrid = tune,
+          metric = metric,
+          trControl = caretctrl
+        )
+      } else if (classifier == "rf") {
+        tune=data.frame(mtry=tp)
+        fm = as.formula(paste0(as.factor(label_col), " ~ ."))
+        cvModel = train(
+          form = fm,
+          data = train_set,
+          method = classifier,
+          tuneLength = 1,
+          tuneGrid = tune,
+          metric = metric,
+          trControl = caretctrl
+        )
+      } else if(classifier == "svm"){
+        train(form = fm,
+              data = train_set,
+              method = "svmLinear",
+              trControl = caretctrl,
+              preProcess = c("center","scale"))
+      }
+      else { # for lda and qda, which do not have hyper parameter
+        cvModel = train(
+          form = fm,
+          data = train_set,
+          method = classifier,
+          preProcess = c("center","scale"),
+          tuneLength = 1,
+          metric = metric,
+          trControl = caretctrl
+        )
+      }
+      y_pred_prob = predict(cvModel, newdata = val_set, type ="prob")
+      roc_obj=roc(val_set[[label_col]] ~ y_pred_prob[,"1"], smoothed=TRUE, plot=FALSE)
 
-  rset_obj <- new_rset(
-    splits = out,
-    ids = names,
-    subclass = c("vfold_cv", "rset"),
-    attrib = cv_att
-  )
+      #get the "best" "threshold"
+      thres = as.numeric(coords(roc_obj, "best", "threshold")['threshold'])
+      # Loss computation
+      y_pred <- as.factor(ifelse(y_pred_prob[,"1"] > thres, "1", "-1"))
 
-  return(rset_obj)
+      test_set = data.frame(obs = as.factor(c(val_set[, label_col])), pred =as.factor( c(y_pred)))
+
+      acc = confusionMatrix(data = test_set$pred, reference = test_set$obs, mode = "prec_recall")$overall[["Accuracy"]]
+      pre = preconfusionMatrix(data = test_set$pred, reference = test_set$obs, mode = "prec_recall")$byClass[["Precision"]]
+      rec = confusionMatrix(data = test_set$pred, reference = test_set$obs, mode = "prec_recall")$byClass[["Recall"]]
+      f1 = confusionMatrix(data = test_set$pred, reference = test_set$obs, mode = "prec_recall")$byClass[["F1"]]
+
+      test_set = data.frame(obs = as.numeric(c(val_set[, label_col])), pred = as.numeric(c(y_pred)))
+      # create roc curve
+      roc_object <- roc( test_set$obs, test_set$pred)
+      # calculate area under curve
+      auc = round(auc(roc_object)[1], 3)
+      #plot(roc_object ,main ="ROC curve -- Logistic Regression ")
+
+
+      if (verbose) {
+        print(sprintf("The average accuracy of %s classifier with %f tunning parameter at %f fold is %f", classifier, tp, i, l))
+      }
+      threshold[i,j] = thres
+      accuracy_vector[i,j] = acc
+      precision_vector[i,j] = pre
+      recall_vector[i,j] = rec
+      F1_vector[i,j] = f1
+      auc_vector[i,j] = auc
+    }
+
+  }
+  return (list("accuracy" = accuracy_vector,"precision" = precision_vector,
+               "recall" = recall_vector,"F1_score" = F1_vector,
+               "AUC" = auc_vector, "threshold" = threshold))
 }
-b = make_cvsplits(train, .method = "block", .columns = 2, .rows = 3, .k = 5)
 
-train = train%>%
-  mutate(across(expert_label, factor))
-
-dt_rec <- recipe(expert_label ~ ., data = train) %>%
-  step_rm(x_coordinate, y_coordinate, class) %>%
-  step_scale(all_predictors())
-
-logreg_mod <- logistic_reg(mode = "classification", engine = "glm")
-
-CVmaster <- function(.train, .classifier, .recipe, .method, .columns,
-                     .rows, .k, .metrics = metric_set(accuracy)) {
-  fit <- workflow() %>%
-    add_recipe(.recipe) %>%
-    add_model(.classifier) %>%
-    fit_resamples(
-      make_cvsplits(.train, .method, .columns, .rows, .k),
-      metrics = .metrics
-    )
-  return(select(bind_rows(fit$.metrics), -.config))
-}
-##test
-CVmaster(
-  train,
-  "rf_mod",
-  dt_rec,
-  .method = "block",
-  .columns = 3,
-  .rows = 3,
-  .k = 10,
-  .metrics = metric_set(accuracy, mn_log_loss, kap, yardstick::spec, sens)
-)

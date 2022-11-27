@@ -211,10 +211,10 @@ We report the accuracy of a trivial classifier that predicts every pixel as non-
 \hline
 Splitting Method & Set & Accuracy\\
 \hline
-Block & Validation & 64.44\%\\
-Block & Test & 61.08\%\\
-Stratified & Validation & 61.08\%\\
-Stratified & Test & 61.08\%\\
+Block  & Validation & 60.27\%\\
+Block & Test & 75.87\%\\
+Horizontal Block& Validation & 55.74\%\\
+Horizontal Block & Test & 90.28\%\\
 \hline
 \end{tabular}
 \caption{Accuracy of a trivial classifier.}
@@ -224,7 +224,7 @@ Stratified & Test & 61.08\%\\
 \centering
 \begin{tabular}{|l|c|c|}
   \hline
-  Var & Scores of Stratified & Scores of Block  \\ 
+  Var & Scores of Block & Scores of Horizontal Block  \\ 
   \hline
   NDAI & 411.70 & 385.45  \\ 
   log(SD) & 332.08 & 310.61  \\ 
