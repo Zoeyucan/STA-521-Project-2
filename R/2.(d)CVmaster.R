@@ -1,9 +1,8 @@
 library(caret)
-library(data.table)
 library(pROC)
 library(tidyverse)
-library(pROC)
 
+#function:find_blocks & split_data---------------------------------------------------------------------
 find_blocks = function(x, y, cols = 2,rows = 3) {
   x_min = min(x)
   x_max = max(x)
@@ -54,15 +53,17 @@ split_data = function(data, cols = 2,rows = 3) {
 }
 
 
-trainData = read_rds("cache/02_train.rds")
-trainData$expert_label=factor(trainData$expert_label)
-lr_model = cvMaster(trainData, classifier="glmnet", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.01,0.001)))
-#cvMaster-----------------------------------------------------------------------
-cvMaster = function(trainData,method = 'Block', label_col = "expert_label", folds=6, classifier="qda", metric="Accuracy",
-                 tune_param = c(-1), verbose = T) {
-
-
-
+#CVmaster-----------------------------------------------------------------------
+cvMaster = function(trainData,method = 'Block', label_col = "expert_label", folds=6, classifier="qda", metric="Accuracy",tune_param = c(-1), verbose = T) {
+  # trainData
+  # method = 'Block'
+  # label_col = "expert_label"
+  # folds=6
+  # classifier="glmnet"
+  # metric="Accuracy"
+  # tune_param = c(0,0.0005, seq(0.001,0.01,0.001))
+  # verbose = T
+  library(caret)
  set.seed(1)
   #use training data from data splitting
   if(method == 'Block'){
@@ -91,15 +92,15 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
   F1_vector = matrix(0, folds, length(tune_param))
   auc_vector = matrix(0, folds, length(tune_param))
   threshold = matrix(0, folds, length(tune_param))
-  for (i in 1:folds) {
+ for (i in 1:folds) {
     # build train, val dataset
     val_set = trainData%>%filter(block == i)%>%select(-block)
     train_set = trainData%>%filter(block != i)%>%select(-block)
     # Training using Caret Wrapper
-    for (j in 1:length(tune_param)) {
+   for (j in 1:length(tune_param)) {
       tp = tune_param[j]
       fm = as.formula(paste0(label_col, " ~ ."))
-      caretctrl = trainControl(method = "none",classProbs = TRUE)
+      caretctrl = trainControl(method = "none")
       # since different model we use intake different preprocess option and different hyper parameter,
       # here we use if-else to specify the training process
       if (classifier == "glmnet") {
@@ -115,8 +116,7 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
           metric = metric,
           trControl = caretctrl
         )
-      }
-      else if (classifier == "rpart") {
+      }else if (classifier == "rpart") {
         tune=data.frame(cp=tp)
         cvModel = train(
           form = fm,
@@ -127,7 +127,7 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
           metric = metric,
           trControl = caretctrl
         )
-      } else if (classifier == "rf") {
+      }else if (classifier == "rf") {
         tune=data.frame(mtry=tp)
         fm = as.formula(paste0(as.factor(label_col), " ~ ."))
         cvModel = train(
@@ -139,14 +139,13 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
           metric = metric,
           trControl = caretctrl
         )
-      } else if(classifier == "svm"){
+      }else if(classifier == "svm"){
         train(form = fm,
               data = train_set,
               method = "svmLinear",
               trControl = caretctrl,
               preProcess = c("center","scale"))
-      }
-      else { # for lda and qda, which do not have hyper parameter
+      }else { # for lda and qda, which do not have hyper parameter
         cvModel = train(
           form = fm,
           data = train_set,
@@ -168,7 +167,7 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
       test_set = data.frame(obs = as.factor(c(val_set[, label_col])), pred =as.factor( c(y_pred)))
 
       acc = confusionMatrix(data = test_set$pred, reference = test_set$obs, mode = "prec_recall")$overall[["Accuracy"]]
-      pre = preconfusionMatrix(data = test_set$pred, reference = test_set$obs, mode = "prec_recall")$byClass[["Precision"]]
+      pre = confusionMatrix(data = test_set$pred, reference = test_set$obs, mode = "prec_recall")$byClass[["Precision"]]
       rec = confusionMatrix(data = test_set$pred, reference = test_set$obs, mode = "prec_recall")$byClass[["Recall"]]
       f1 = confusionMatrix(data = test_set$pred, reference = test_set$obs, mode = "prec_recall")$byClass[["F1"]]
 
@@ -189,11 +188,15 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
       recall_vector[i,j] = rec
       F1_vector[i,j] = f1
       auc_vector[i,j] = auc
-    }
+   }
 
-  }
+ }
   return (list("accuracy" = accuracy_vector,"precision" = precision_vector,
                "recall" = recall_vector,"F1_score" = F1_vector,
                "AUC" = auc_vector, "threshold" = threshold))
 }
+#CVmaster Test-----------------------------------------------------------------------
+trainData = read_rds("cache/02_train.rds")
+trainData$expert_label=factor(trainData$expert_label)
+lr_model = cvMaster(trainData, classifier="glmnet", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.01,0.001)))
 
