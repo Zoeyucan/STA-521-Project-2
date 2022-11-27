@@ -55,14 +55,14 @@ split_data = function(data, cols ,rows ) {
 
 #CVmaster-----------------------------------------------------------------------
 cvMaster = function(trainData,method = 'Block', label_col = "expert_label", folds=6, classifier="qda", metric="Accuracy",tune_param = c(-1), verbose = T) {
-  # trainData = traindata
-  # method = 'Horizontal'
-  # label_col = "expert_label"
-  # folds=10
-  # classifier="glmnet"
-  # metric="Accuracy"
-  # tune_param = c(0,0.0005, seq(0.001,0.01,0.001))
-  # verbose = T
+  trainData = train
+  method = 'Block'
+  label_col = "expert_label"
+  folds=6
+  classifier="svm"
+  metric="Accuracy"
+  tune_param = c(0.5,1)
+  verbose = T
  set.seed(1)
   #use training data from data splitting
   if(method == 'Block'){
@@ -95,6 +95,7 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
   threshold = matrix(0, folds, length(tune_param))
  for (i in 1:folds) {
     # build train, val dataset
+   i=1
     val_set = trainData%>%filter(block == i)%>%select(-block)
     train_set = trainData%>%filter(block != i)%>%select(-block)
     # Training using Caret Wrapper
@@ -130,11 +131,16 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
           trControl = caretctrl
         )
       }else if(classifier == "svm"){
-        train(form = fm,
+        tune=data.frame(C=tp)
+        fm = as.formula(paste0(as.factor(label_col), " ~ ."))
+        cvModel = train(form = fm,
               data = train_set,
               method = "svmLinear",
               trControl = caretctrl,
-              preProcess = c("center","scale"))
+              preProcess = c("center","scale"),
+              tuneLength = 1,
+              tuneGrid = tune,
+              metric = metric)
       }else { # for lda and qda, which do not have hyper parameter
         cvModel = train(
           form = fm,
@@ -193,26 +199,32 @@ lr_model_block = cvMaster(train,method = 'Block', classifier="glmnet", verbose=T
 lr_model_horizon = cvMaster(train,method = 'Horizontal', fold = 10, classifier="glmnet", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.01,0.001)))
 #random forest
 rf_model_block =  cvMaster(train,method = 'Block', classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
-rf_model_horizon =  cvMaster(train,method = 'Horizontal', classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
+rf_model_horizon =  cvMaster(train,method = 'Horizontal', fold = 10, classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
 #qda
 qda_model_block = cvMaster(train, method = 'Block', classifier="qda",  verbose=T)
-qda_model_horizon = cvMaster(train, method = 'Horizontal', classifier="qda",  verbose=T)
+qda_model_horizon = cvMaster(train, method = 'Horizontal', fold = 10, classifier="qda",  verbose=T)
 #lda
 lda_model_block = cvMaster(train, method = 'Block', classifier="lda",  verbose=T)
-lda_model_horizon = cvMaster(train, method = 'Horizontal', classifier="lda",  verbose=T)
+lda_model_horizon = cvMaster(train, method = 'Horizontal', fold = 10, classifier="lda",  verbose=T)
+#svm
+svm_model_block =  cvMaster(train,method = 'Block', classifier="svm", verbose=T, tune_param = c(0.5,1))
+rf_model_horizon =  cvMaster(train,method = 'Horizontal', fold = 10, classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
 
 #save models
 
 lr_model_block%>%write_rds("cache/model_lr_model_block.rds")
 lr_model_horizon%>%write_rds("cache/model_lr_model_horizon.rds")
+
 rf_model_block%>%write_rds("cache/model_rf_model_block.rds")
 rf_model_horizon%>%write_rds("cache/model_rf_model_horizon.rds")
+
 qda_model_block%>%write_rds("cache/model_qda_model_block.rds")
 qda_model_horizon%>%write_rds("cache/model_qda_model_horizon.rds")
+
 lda_model_block%>%write_rds("cache/model_lda_model_block.rds")
 lda_model_horizon%>%write_rds("cache/model_lda_model_horizon.rds")
 
-
+#read training data
 
 
 
