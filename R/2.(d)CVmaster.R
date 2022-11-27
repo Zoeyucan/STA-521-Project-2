@@ -59,7 +59,7 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
   method = 'Block'
   label_col = "expert_label"
   folds=6
-  classifier="svm"
+  classifier="svmLinear"
   metric="Accuracy"
   tune_param = c(0.5,1)
   verbose = T
@@ -95,11 +95,15 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
   threshold = matrix(0, folds, length(tune_param))
  for (i in 1:folds) {
     # build train, val dataset
-   i=1
+   i = 1
     val_set = trainData%>%filter(block == i)%>%select(-block)
     train_set = trainData%>%filter(block != i)%>%select(-block)
+
+    colnames(train_set) <- make.names(colnames(train_set))
+    colnames(val_set) <- make.names(colnames(val_set))
     # Training using Caret Wrapper
    for (j in 1:length(tune_param)) {
+     j = 1
       tp = tune_param[j]
       fm = as.formula(paste0(label_col, " ~ ."))
       caretctrl = trainControl(method = "none")
@@ -120,7 +124,6 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
         )
       }else if (classifier == "rf") {
         tune=data.frame(mtry=tp)
-        fm = as.formula(paste0(as.factor(label_col), " ~ ."))
         cvModel = train(
           form = fm,
           data = train_set,
@@ -130,18 +133,28 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
           metric = metric,
           trControl = caretctrl
         )
-      }else if(classifier == "svm"){
+      }else if (classifier == "rpart") {
+        tune=data.frame(cp=tp)
+        cvModel = train(
+          form = fm,
+          data = train_set,
+          method = classifier,
+          tuneLength = 1,
+          tuneGrid = tune,
+          metric = metric,
+          trControl = caretctrl
+        )
+      }else if(classifier == "svmLinear"){
         tune=data.frame(C=tp)
-        fm = as.formula(paste0(as.factor(label_col), " ~ ."))
         cvModel = train(form = fm,
               data = train_set,
-              method = "svmLinear",
-              trControl = caretctrl,
-              preProcess = c("center","scale"),
+              method = classifier,
               tuneLength = 1,
               tuneGrid = tune,
-              metric = metric)
-      }else { # for lda and qda, which do not have hyper parameter
+              metric = metric,
+              trControl = caretctrl,
+              preProcess = c("center","scale"))
+        }else { # for lda and qda, which do not have hyper parameter
         cvModel = train(
           form = fm,
           data = train_set,
@@ -200,6 +213,11 @@ lr_model_horizon = cvMaster(train,method = 'Horizontal', fold = 10, classifier="
 #random forest
 rf_model_block =  cvMaster(train,method = 'Block', classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
 rf_model_horizon =  cvMaster(train,method = 'Horizontal', fold = 10, classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
+
+#decision tree
+dt_model_block =  cvMaster(train,method = 'Block', classifier="rpart", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.03,0.001)))
+dt_model_horizon =  cvMaster(train,method = 'Horizontal', fold = 10, classifier="rpart", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.03,0.001)))
+
 #qda
 qda_model_block = cvMaster(train, method = 'Block', classifier="qda",  verbose=T)
 qda_model_horizon = cvMaster(train, method = 'Horizontal', fold = 10, classifier="qda",  verbose=T)
@@ -207,8 +225,8 @@ qda_model_horizon = cvMaster(train, method = 'Horizontal', fold = 10, classifier
 lda_model_block = cvMaster(train, method = 'Block', classifier="lda",  verbose=T)
 lda_model_horizon = cvMaster(train, method = 'Horizontal', fold = 10, classifier="lda",  verbose=T)
 #svm
-svm_model_block =  cvMaster(train,method = 'Block', classifier="svm", verbose=T, tune_param = c(0.5,1))
-rf_model_horizon =  cvMaster(train,method = 'Horizontal', fold = 10, classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
+# svm_model_block =  cvMaster(train,method = 'Block', classifier="svm", verbose=T, tune_param = c(0.5,1))
+# rf_model_horizon =  cvMaster(train,method = 'Horizontal', fold = 10, classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
 
 #save models
 
@@ -217,6 +235,10 @@ lr_model_horizon%>%write_rds("cache/model_lr_model_horizon.rds")
 
 rf_model_block%>%write_rds("cache/model_rf_model_block.rds")
 rf_model_horizon%>%write_rds("cache/model_rf_model_horizon.rds")
+
+dt_model_block%>%write_rds("cache/model_dt_model_block.rds")
+dt_model_horizon%>%write_rds("cache/model_dt_model_horizon.rds")
+
 
 qda_model_block%>%write_rds("cache/model_qda_model_block.rds")
 qda_model_horizon%>%write_rds("cache/model_qda_model_horizon.rds")
