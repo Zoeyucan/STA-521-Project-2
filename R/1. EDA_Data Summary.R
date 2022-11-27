@@ -57,7 +57,7 @@ pixel_img1 = image %>%
     )
   )%>%ggplot(aes(x = x_coordinate, y = y_coordinate, color = factor(expert_label))) +
   geom_point() +
-  scale_color_manual(values = c( "Cloud" = "white","Unlabelled" = "black","No cloud" = "gray"),
+  scale_color_manual(values = c( "Cloud" = "#F4EDCA","Unlabelled" = "#C4961A","No cloud" = "#FFDB6D"),
                      name = "expert_label") +
   labs(x = "X Coordinate", y = "Y Coordinate") +
   theme_bw()  + facet_grid(~class)
@@ -75,7 +75,7 @@ ggsave(
 #part c------------------------------------------------------------------------
 ## correlation
 corr = cor(image[3:11])
-c1 = ggcorrplot(corr, method = 'square', type = "lower",legend.title = "Correlation",
+c1 = ggcorrplot(corr, method = 'square',type = "upper",legend.title = "Correlation",
                 lab_size  =  3,lab=TRUE,tl.cex=10,colors = c("#6D9EC1", "white", "#E46726"))
 ggsave(
   "graphs/corrplot.png",
