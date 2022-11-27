@@ -157,7 +157,7 @@ roc_imp_block_h$score <- as.double(roc_imp_block_h$score)
 roc_imp_block_h[order(roc_imp_block_h$score,decreasing = TRUE),]
 roc_imp_block_h$set = "Horizontal Block"
 
-df_roc_imp = rbind(roc_imp_block,roc_imp_block_h,)
+df_roc_imp = bind_rows(roc_imp_block,roc_imp_block_h,)
 
 
 varimp = ggplot(df_roc_imp, aes(x=reorder(variable, score), y=score,fill=set)) +

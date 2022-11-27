@@ -3,7 +3,7 @@ library(pROC)
 library(tidyverse)
 
 #function:find_blocks & split_data---------------------------------------------------------------------
-find_blocks = function(x, y, cols = 2,rows = 3) {
+find_blocks = function(x, y, cols ,rows ) {
   x_min = min(x)
   x_max = max(x)
   x_step = (x_max-x_min)/cols
@@ -37,7 +37,7 @@ find_blocks = function(x, y, cols = 2,rows = 3) {
 }
 
 
-split_data = function(data, cols = 2,rows = 3) {
+split_data = function(data, cols ,rows ) {
   final_data = tibble()
   block = find_blocks(data$x_coordinate,data$y_coordinate,cols,rows)
   for (i in seq_len(nrow(block))) {
@@ -55,15 +55,14 @@ split_data = function(data, cols = 2,rows = 3) {
 
 #CVmaster-----------------------------------------------------------------------
 cvMaster = function(trainData,method = 'Block', label_col = "expert_label", folds=6, classifier="qda", metric="Accuracy",tune_param = c(-1), verbose = T) {
-  # trainData
-  # method = 'Block'
+  # trainData = traindata
+  # method = 'Horizontal'
   # label_col = "expert_label"
-  # folds=6
+  # folds=10
   # classifier="glmnet"
   # metric="Accuracy"
   # tune_param = c(0,0.0005, seq(0.001,0.01,0.001))
   # verbose = T
-  library(caret)
  set.seed(1)
   #use training data from data splitting
   if(method == 'Block'){
@@ -74,7 +73,7 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
     else{
       stop("Please input correct folds")
     }
-  }else{
+  }else if(method == 'Horizontal'){
     if(folds == 10){
       trainData = split_data(trainData, cols = 1,rows = 10)
     }
@@ -82,6 +81,8 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
       stop("Please input correct folds")
     }
 
+  }else{
+    stop("Please input correct method")
   }
  trainData=trainData%>%
     mutate('log(SD)' = log(SD))%>%
@@ -111,17 +112,6 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
           method = classifier,
           family = "binomial",
           preProcess = c("center","scale"),
-          tuneLength = 1,
-          tuneGrid = tune,
-          metric = metric,
-          trControl = caretctrl
-        )
-      }else if (classifier == "rpart") {
-        tune=data.frame(cp=tp)
-        cvModel = train(
-          form = fm,
-          data = train_set,
-          method = classifier,
           tuneLength = 1,
           tuneGrid = tune,
           metric = metric,
@@ -180,7 +170,7 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
 
 
       if (verbose) {
-        print(sprintf("The average accuracy of %s classifier with %f tunning parameter at %f fold is %f", classifier, tp, i, l))
+        print(sprintf("The average accuracy of %s classifier with %f tunning parameter at %f fold is %f", classifier, tp, i, acc))
       }
       threshold[i,j] = thres
       accuracy_vector[i,j] = acc
@@ -196,7 +186,40 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
                "AUC" = auc_vector, "threshold" = threshold))
 }
 #CVmaster Test-----------------------------------------------------------------------
-trainData = read_rds("cache/02_train.rds")
-trainData$expert_label=factor(trainData$expert_label)
-lr_model = cvMaster(trainData, classifier="glmnet", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.01,0.001)))
+train = read_rds("cache/02_train.rds")
+train$expert_label=factor(train$expert_label)
+#logistic regression
+lr_model_block = cvMaster(train,method = 'Block', classifier="glmnet", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.01,0.001)))
+lr_model_horizon = cvMaster(train,method = 'Horizontal', fold = 10, classifier="glmnet", verbose=T, tune_param = c(0,0.0005, seq(0.001,0.01,0.001)))
+#random forest
+rf_model_block =  cvMaster(train,method = 'Block', classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
+rf_model_horizon =  cvMaster(train,method = 'Horizontal', classifier="rf", verbose=T, tune_param = seq(1, 8, by=1))
+#qda
+qda_model_block = cvMaster(train, method = 'Block', classifier="qda",  verbose=T)
+qda_model_horizon = cvMaster(train, method = 'Horizontal', classifier="qda",  verbose=T)
+#lda
+lda_model_block = cvMaster(train, method = 'Block', classifier="lda",  verbose=T)
+lda_model_horizon = cvMaster(train, method = 'Horizontal', classifier="lda",  verbose=T)
+
+#save models
+
+lr_model_block%>%write_rds("cache/model_lr_model_block.rds")
+lr_model_horizon%>%write_rds("cache/model_lr_model_horizon.rds")
+rf_model_block%>%write_rds("cache/model_rf_model_block.rds")
+rf_model_horizon%>%write_rds("cache/model_rf_model_horizon.rds")
+qda_model_block%>%write_rds("cache/model_qda_model_block.rds")
+qda_model_horizon%>%write_rds("cache/model_qda_model_horizon.rds")
+lda_model_block%>%write_rds("cache/model_lda_model_block.rds")
+lda_model_horizon%>%write_rds("cache/model_lda_model_horizon.rds")
+
+
+
+
+
+
+
+
+
+
+
 
