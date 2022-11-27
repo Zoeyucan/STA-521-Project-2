@@ -37,6 +37,7 @@ find_blocks = function(x, y, cols ,rows ) {
 }
 
 
+
 split_data = function(data, cols ,rows ) {
   final_data = tibble()
   block = find_blocks(data$x_coordinate,data$y_coordinate,cols,rows)
@@ -55,14 +56,14 @@ split_data = function(data, cols ,rows ) {
 
 #CVmaster-----------------------------------------------------------------------
 cvMaster = function(trainData,method = 'Block', label_col = "expert_label", folds=6, classifier="qda", metric="Accuracy",tune_param = c(-1), verbose = T) {
-  trainData = train
-  method = 'Block'
-  label_col = "expert_label"
-  folds=6
-  classifier="svmLinear"
-  metric="Accuracy"
-  tune_param = c(0.5,1)
-  verbose = T
+  # trainData = train
+  # method = 'Block'
+  # label_col = "expert_label"
+  # folds=6
+  # classifier="svmLinear"
+  # metric="Accuracy"
+  # tune_param = c(0.5,1)
+  # verbose = T
  set.seed(1)
   #use training data from data splitting
   if(method == 'Block'){
@@ -95,7 +96,7 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
   threshold = matrix(0, folds, length(tune_param))
  for (i in 1:folds) {
     # build train, val dataset
-   i = 1
+   # i = 1
     val_set = trainData%>%filter(block == i)%>%select(-block)
     train_set = trainData%>%filter(block != i)%>%select(-block)
 
@@ -103,7 +104,7 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
     colnames(val_set) <- make.names(colnames(val_set))
     # Training using Caret Wrapper
    for (j in 1:length(tune_param)) {
-     j = 1
+     # j = 1
       tp = tune_param[j]
       fm = as.formula(paste0(label_col, " ~ ."))
       caretctrl = trainControl(method = "none")
@@ -144,17 +145,7 @@ cvMaster = function(trainData,method = 'Block', label_col = "expert_label", fold
           metric = metric,
           trControl = caretctrl
         )
-      }else if(classifier == "svmLinear"){
-        tune=data.frame(C=tp)
-        cvModel = train(form = fm,
-              data = train_set,
-              method = classifier,
-              tuneLength = 1,
-              tuneGrid = tune,
-              metric = metric,
-              trControl = caretctrl,
-              preProcess = c("center","scale"))
-        }else { # for lda and qda, which do not have hyper parameter
+      }else { # for lda and qda, which do not have hyper parameter
         cvModel = train(
           form = fm,
           data = train_set,
