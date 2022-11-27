@@ -57,8 +57,6 @@ pixel_img1 = image %>%
     )
   )%>%ggplot(aes(x = x_coordinate, y = y_coordinate, color = factor(expert_label))) +
   geom_point() +
-  scale_x_continuous(expand = c(0, 0)) +
-  scale_y_continuous(expand = c(0, 0)) +
   scale_color_manual(values = c( "Cloud" = "white","Unlabelled" = "black","No cloud" = "gray"),
                      name = "expert_label") +
   labs(x = "X Coordinate", y = "Y Coordinate") +

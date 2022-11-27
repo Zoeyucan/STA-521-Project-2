@@ -169,3 +169,6 @@ ggsave(
   units = "cm"
 )
 
+train %>%
+  filter(expert_label != 0) %>%
+  write_rds("cache/2_train_block.rds")
