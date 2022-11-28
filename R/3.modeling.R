@@ -29,7 +29,7 @@ params_rf = list(block = find_best_parameter(rf_model_block,seq(1, 8, by=1)),
                  horizon = find_best_parameter(rf_model_horizon,seq(1, 8, by=1)))
 params_dt = list(block = find_best_parameter(rf_model_block,c(0,0.0005, seq(0.001,0.03,0.001))),
                  horizon = find_best_parameter(rf_model_horizon,c(0,0.0005, seq(0.001,0.03,0.001))))
-
+write_rds(params_rf,"cache/03_params_rf.rds")
 #read training data
 train_block = read_rds("cache/02_train_block_2_3.rds")
 train_horizon = read_rds("cache/02_train_block_1_10.rds")
@@ -106,6 +106,43 @@ model_rf_horizon = model_train(trainData = train_horizon,classifier = 'rf',best_
 model_dt_horizon = model_train(trainData = train_horizon,classifier = 'rpart',best_params = params_dt$horizon)
 model_qda_horizon = model_train(trainData = train_horizon,classifier = 'qda')
 model_lda_horizon = model_train(trainData = train_horizon,classifier = 'lda')
+
+write_rds(model_rf_block,"cache/model_rf_block.rds")
+write_rds(model_rf_horizon,"cache/model_rf_horizon.rds")
+
+rfimp_block = varImp(model_rf_block, scale = FALSE)
+rfimp_horizon = varImp(model_rf_horizon, scale = FALSE)
+
+rfimp_block <- data.frame(cbind(variable = rownames(rfimp_block$importance), score = rfimp_block$importance[,1]))
+rfimp_block$score <- as.double(rfimp_block$score)
+
+rfimp_block[order(rfimp_block$score,decreasing = TRUE),]
+rfimp_block$set = "Block"
+
+rfimp_horizon <- data.frame(cbind(variable = rownames(rfimp_horizon$importance), score = rfimp_horizon$importance[,1]))
+rfimp_horizon$score <- as.double(rfimp_horizon$score)
+
+rfimp_horizon[order(rfimp_horizon$score,decreasing = TRUE),]
+rfimp_horizon$set = "Horizon"
+
+df_roc_imp = bind_rows(rfimp_block,rfimp_horizon,)
+
+
+varimp = ggplot(df_roc_imp, aes(x=reorder(variable, score), y=score,fill=set)) +
+  #  geom_point() +
+  geom_bar(stat = 'identity', position = position_dodge(0.5),width = 0.5)+
+  scale_fill_manual(values=c('black','gray'))+
+  #geom_segment(aes(x=variable,xend=variable,y=0,yend=score,color = set,alpha = 0.7,linewidth = 5)) +
+  ylab("Variable Importance") +
+  xlab("Variable Name") +
+  coord_flip()+  theme_bw()
+ggsave(
+  "graphs/rf_varimp_image.png",
+  varimp,
+  width = 15,
+  height = 12,
+  units = "cm"
+)
 
 #accuracy
 

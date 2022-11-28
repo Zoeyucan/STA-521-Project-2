@@ -37,7 +37,6 @@ for(i in metric.list_block){
                " recall: ",round(i$recall,3),
                " f1: ",round(i$f1score,3),
                " AUC: ",round(i$AUC,3),
-               " threshold",round(i$threshold,3)
                ))
 }
 metric.list_horizon = list(metric_lr_horizon,
@@ -57,6 +56,7 @@ for(i in metric.list_horizon){
                " recall: ",round(i$recall,3),
                " f1: ",round(i$f1score,3),
                " AUC: ",round(i$AUC,3),
-               " threshold",round(i$threshold,3)
+               " threshold:",round(i$threshold,3)
   ))
 }
+
