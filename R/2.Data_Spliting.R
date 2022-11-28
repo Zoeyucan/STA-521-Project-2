@@ -191,3 +191,6 @@ train_block_1_10 %>%
 val_block_1_10 %>%
   filter(expert_label != 0) %>%
   write_rds("cache/02_val_block_1_10.rds")
+test_block %>%
+  filter(expert_label != 0) %>%
+  write_rds("cache/02_test.rds")
